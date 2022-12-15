@@ -1,4 +1,4 @@
-package main
+package read_csv
 
 import (
 	"encoding/csv"
@@ -26,14 +26,7 @@ import (
 
 // keys? index slice how? for larger files, return map instead of slices
 
-type inputTest struct {
-	CalendarYearID int // how would calendar year be input?
-	ModelYearID    int // top row, model year <= calendar year
-	AgeFractionID  float64
-	//	SizeClassID int
-	//	TierID      string
-	// VPOP float64
-}
+
 
 func assignFields(emptyStruct interface{}, row []string) interface{} {
 
@@ -90,7 +83,7 @@ func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 	return data_array
 }
 
-func getValue(value interface{}) interface{} {
+func GetValue(value interface{}) interface{} {
 
 	if reflect.TypeOf(value).Kind() == reflect.Ptr {
 
@@ -104,7 +97,7 @@ func getValue(value interface{}) interface{} {
 
 }
 
-func getFields(value interface{}) [][]string {
+func GetFields(value interface{}) [][]string {
 	fields := [][]string{}
 
 	structElements := reflect.ValueOf(value).Elem()
@@ -119,7 +112,7 @@ func getFields(value interface{}) [][]string {
 	return fields
 }
 
-func importData(dir string) []interface{} {
+func ImportData(emptyStruct interface{}, dir string) []interface{} {
 
 	// TODO: check if dir or single file
 
@@ -154,35 +147,19 @@ func importData(dir string) []interface{} {
 	if err != nil {
 		log.Fatal(err)
 	}
-	data_array := readInput(&inputTest{}, data)
+	data_array := readInput(emptyStruct, data)
 
-	fmt.Println(data_array)
 
-	// fmt.Println(reflect.ValueOf(data_array[0]).Elem().Type())
-	fmt.Println("Value of first point:", getValue(data_array[0]))
-
-	fields := getFields(getValue(&data_array[0]))
-	// or -> fields := getFields(data_array[0])
-
-	fmt.Println("Struct fields:", fields)
 
 	return data_array
 }
 
-func arrToValues(data_array []interface{}) []interface{} {
+func ArrToValues(data_array []interface{}) []interface{} {
 
 	convData_Array := make([]interface{}, len(data_array))
 	for i := 0; i < len(data_array); i++ {
-		convData_Array[i] = getValue(data_array[i])
+		convData_Array[i] = GetValue(data_array[i])
 	}
 	return convData_Array
 }
 
-var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator" // will be from call
-
-func main() {
-	data_array := importData(dir)
-	fmt.Println(data_array)
-	convData_Array := arrToValues(data_array)
-	fmt.Println(convData_Array)
-}

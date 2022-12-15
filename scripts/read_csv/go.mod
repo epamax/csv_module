@@ -1,3 +1,3 @@
-module io/read_csv
+module example.com/read_csv
 
 go 1.19
