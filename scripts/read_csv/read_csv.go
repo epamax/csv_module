@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+// TODO: re-assign structs and values to return? doesn't seem to retain the fields after returning
+// TODO: also indexby function to create a map to index the 
 // framework_io.ReadCSV(filepath, &dataTemplate{})
 // return slice of templates
 // make([]inputTest, 0)
@@ -26,13 +28,18 @@ import (
 
 // keys? index slice how? for larger files, return map instead of slices
 
-
+// type Data struct {
+// 	fields interface{}
+// 	types ...
+// 	indexed map[string]interface{} 
+// }
 
 func assignFields(emptyStruct interface{}, row []string) interface{} {
 
 	structElements := reflect.ValueOf(emptyStruct).Elem()
 	structTypes := structElements.Type()
 	dataCopy := reflect.New(structTypes).Interface()
+	// dataCopy := emptyStruct
 	// dataCopy := reflect.New(reflect.TypeOf(emptyStruct))
 
 	for j := 0; j < structElements.NumField(); j++ {
@@ -61,6 +68,19 @@ func assignFields(emptyStruct interface{}, row []string) interface{} {
 	return dataCopy
 }
 
+// func (d *Data), what does * do here
+// d.fields := getfields, map with field, index?
+// d.types = := gettypes, map with type, index?
+// d.indexby := map[indexbystring]value
+
+// fieldbyindex := d.fields[index] = field
+// doesn't matter data_array index, will all be same
+// but matters for value
+
+// valbyindex := data_array[index]
+// want to be able to do something like data_array.getvalue(index = 0, field = 0)
+// easier to iterate through whole array
+
 func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 
 	// use reflection to grab each struct member's name & type
@@ -80,6 +100,9 @@ func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 			// fmt.Println(reflect.ValueOf(inputAtom).Elem().FieldByName(varName).Set())
 		}
 	}
+	
+	// d.data_array := data_array[0]
+
 	return data_array
 }
 
@@ -111,6 +134,39 @@ func GetFields(value interface{}) [][]string {
 	}
 	return fields
 }
+
+// index of?
+
+func TypeByField(field string, dataStruct interface{}) reflect.Type {
+	return reflect.ValueOf(dataStruct).Elem().FieldByName(field).Type()
+}
+
+func TypeByIndex(index int, dataStruct interface{}) reflect.Type {
+	return reflect.ValueOf(dataStruct).Elem().Field(index).Type()
+}
+
+func ValByField(field string, dataStruct interface{}) reflect.Value {
+	return reflect.ValueOf(dataStruct).Elem().FieldByName(field)
+}
+
+func ValByIndex(index int, dataStruct interface{}) reflect.Value {
+	return reflect.ValueOf(dataStruct).Elem().Field(index)
+}
+
+func FieldByIndex(index int, dataStruct interface{}) string {
+	structElements := reflect.ValueOf(dataStruct).Elem()
+	structTypes := structElements.Type()
+
+	if index  < structElements.NumField() {
+		varName := structTypes.Field(index).Name
+		return varName
+		// varType := structTypes.Field(j).Type.Kind()
+	} else {
+		fmt.Println("Index out of bounds for struct of length", structElements.NumField())
+		return ""
+		}
+	}
+
 
 func ImportData(emptyStruct interface{}, dir string) []interface{} {
 
