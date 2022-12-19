@@ -11,7 +11,7 @@ import (
 )
 
 // TODO: re-assign structs and values to return? doesn't seem to retain the fields after returning
-// TODO: also indexby function to create a map to index the 
+// TODO: also indexby function to create a map to index the
 // framework_io.ReadCSV(filepath, &dataTemplate{})
 // return slice of templates
 // make([]inputTest, 0)
@@ -28,11 +28,11 @@ import (
 
 // keys? index slice how? for larger files, return map instead of slices
 
-// type Data struct {
-// 	fields interface{}
-// 	types ...
-// 	indexed map[string]interface{} 
-// }
+type Data struct {
+	Fields map[int]string
+	Types  map[int]reflect.Kind
+	// indexed map[string]interface{}
+}
 
 func assignFields(emptyStruct interface{}, row []string) interface{} {
 
@@ -81,6 +81,7 @@ func assignFields(emptyStruct interface{}, row []string) interface{} {
 // want to be able to do something like data_array.getvalue(index = 0, field = 0)
 // easier to iterate through whole array
 
+// func (d *Data) readInput(emptyStruct interface{}, data [][]string) []interface{} {
 func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 
 	// use reflection to grab each struct member's name & type
@@ -92,15 +93,16 @@ func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 			// header := data[i]
 			// fmt.Println(header)
 			continue
-		} else {
-			row := data[i]
-			// data_copy := dereferenceIfPtr(assignFields(emptyStruct, row))
-			data_copy := assignFields(emptyStruct, row)
-			data_array = append(data_array, data_copy)
-			// fmt.Println(reflect.ValueOf(inputAtom).Elem().FieldByName(varName).Set())
 		}
+
+		row := data[i]
+		// data_copy := dereferenceIfPtr(assignFields(emptyStruct, row))
+		data_copy := assignFields(emptyStruct, row)
+		data_array = append(data_array, data_copy)
+		// fmt.Println(reflect.ValueOf(inputAtom).Elem().FieldByName(varName).Set())
+		// d.getFields(data_copy)
 	}
-	
+
 	// d.data_array := data_array[0]
 
 	return data_array
@@ -120,8 +122,13 @@ func GetValue(value interface{}) interface{} {
 
 }
 
-func GetFields(value interface{}) [][]string {
-	fields := [][]string{}
+// func (d *Data) getFields(value interface{}) {
+// d...=fields?
+
+func (d *Data) GetFields(value interface{}) {
+	// fields := [][]string{}
+	fields := make(map[int]string)
+	types := make(map[int]reflect.Kind)
 
 	structElements := reflect.ValueOf(value).Elem()
 	structTypes := structElements.Type()
@@ -129,46 +136,51 @@ func GetFields(value interface{}) [][]string {
 	for j := 0; j < structElements.NumField(); j++ {
 		varName := structTypes.Field(j).Name
 		varType := structTypes.Field(j).Type.Kind()
-		name_type := []string{varName, fmt.Sprint(varType)}
-		fields = append(fields, name_type)
+		fields[j] = varName
+		types[j] = varType
+
+		// name_type := []string{varName, fmt.Sprint(varType)}
+		// fields = append(fields, name_type)
 	}
-	return fields
+	d.Fields = fields
+	d.Types = types
 }
 
-// index of?
+// Used originally before getting fields through type conversion, unneccessary now
 
-func TypeByField(field string, dataStruct interface{}) reflect.Type {
-	return reflect.ValueOf(dataStruct).Elem().FieldByName(field).Type()
-}
+// func TypeByField(field string, dataStruct interface{}) reflect.Type {
+// 	return reflect.ValueOf(dataStruct).Elem().FieldByName(field).Type()
+// }
 
-func TypeByIndex(index int, dataStruct interface{}) reflect.Type {
-	return reflect.ValueOf(dataStruct).Elem().Field(index).Type()
-}
+// func TypeByIndex(index int, dataStruct interface{}) reflect.Type {
+// 	return reflect.ValueOf(dataStruct).Elem().Field(index).Type()
+// }
 
-func ValByField(field string, dataStruct interface{}) reflect.Value {
-	return reflect.ValueOf(dataStruct).Elem().FieldByName(field)
-}
+// func ValByField(field string, dataStruct interface{}) reflect.Value {
+// 	return reflect.ValueOf(dataStruct).Elem().FieldByName(field)
+// }
 
-func ValByIndex(index int, dataStruct interface{}) reflect.Value {
-	return reflect.ValueOf(dataStruct).Elem().Field(index)
-}
+// func ValByIndex(index int, dataStruct interface{}) reflect.Value {
+// 	return reflect.ValueOf(dataStruct).Elem().Field(index)
+// }
 
-func FieldByIndex(index int, dataStruct interface{}) string {
-	structElements := reflect.ValueOf(dataStruct).Elem()
-	structTypes := structElements.Type()
+// func FieldByIndex(index int, dataStruct interface{}) string {
+// 	structElements := reflect.ValueOf(dataStruct).Elem()
+// 	structTypes := structElements.Type()
 
-	if index  < structElements.NumField() {
-		varName := structTypes.Field(index).Name
-		return varName
-		// varType := structTypes.Field(j).Type.Kind()
-	} else {
-		fmt.Println("Index out of bounds for struct of length", structElements.NumField())
-		return ""
-		}
-	}
+// 	if index < structElements.NumField() {
+// 		varName := structTypes.Field(index).Name
+// 		return varName
+// 		// varType := structTypes.Field(j).Type.Kind()
+// 	} else {
+// 		fmt.Println("Index out of bounds for struct of length", structElements.NumField())
+// 		return ""
+// 	}
+// }
 
+// func (d *Data) ImportData(emptyStruct interface{}, dir string) []interface{} {
 
-func ImportData(emptyStruct interface{}, dir string) []interface{} {
+func ImportData[t any](emptyStruct interface{}, dir string) (d Data, conv_array []t) {
 
 	// TODO: check if dir or single file
 
@@ -205,17 +217,26 @@ func ImportData(emptyStruct interface{}, dir string) []interface{} {
 	}
 	data_array := readInput(emptyStruct, data)
 
+	conv_array = AssignStruct[t](data_array)
 
+	d.GetFields(data_array[0])
 
-	return data_array
+	return d, conv_array
 }
 
-func ArrToValues(data_array []interface{}) []interface{} {
+func AssignStruct[t any](data_array []any) (conv_array []t) {
 
-	convData_Array := make([]interface{}, len(data_array))
+	conv_array = make([]t, len(data_array))
+
 	for i := 0; i < len(data_array); i++ {
-		convData_Array[i] = GetValue(data_array[i])
+		conv_array[i] = ConvStruct[t](data_array[i])
 	}
-	return convData_Array
+	return conv_array
 }
 
+func ConvStruct[t any](datum interface{}) (dataStruct t) {
+
+	dataStruct = (GetValue(datum)).(t)
+
+	return dataStruct
+}
