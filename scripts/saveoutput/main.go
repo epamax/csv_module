@@ -15,6 +15,8 @@ type inputTest struct {
 	// VPOP float64
 }
 
+// or read from list of keys? variadic ...
+
 func main() {
 
 	var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator" // will be from call
