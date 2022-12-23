@@ -1,4 +1,4 @@
-package main
+package write_csv
 
 import (
 	"encoding/csv"
@@ -24,44 +24,50 @@ func WriteDataToCSV(csvFile string) {
 }
 */
 
-type KeyValue struct {
-	SourceTypeID   int
-	RegClassID     int
-	FuelTypeID     int
-	ModelYearID    int
-	OpModeID       int
-	EmissionRate   float64
-	EmissionRateIM float64
-}
-
-type Key struct {
-	SourceTypeID int
-	RegClassID   int
-	FuelTypeID   int
-	ModelYearID  int
-	OpModeID     int
-}
-
+/*
 var sourceTypeIDs = []int{11, 21, 31, 32, 41, 42, 43, 51, 52, 53, 54, 61, 62}
 var regClassIDs = []int{10, 20, 30, 41, 42, 46, 47, 48, 49}
 var fuelTypeIDs = []int{1, 2, 3, 5, 9}
 var modelYearIDs = intSliceRange(1960, 2060, true)
-var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 35, 36}
+var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 35, 36}
 
 func main() {
 
 	data_table := [][]string{}
-	//	header := getHeader(&KeyValue{})
+	output_table := [][]string{}
+	header := getHeader(&KeyValue{})
 
-	addToTable(&data_table, sourceTypeIDs)
+	// want to be table to build the data from the data_table, idk if its useful at all
+	addToTable(&data_table, sourceTypeIDs) // this is literally just append function
 	addToTable(&data_table, regClassIDs)
 	addToTable(&data_table, fuelTypeIDs)
 	addToTable(&data_table, modelYearIDs)
 	addToTable(&data_table, opModeIDs)
 
-	//	WriteDataToCSV(header, &KeyValue{}) // (header, data, fn)
+	// data_table more like input table, then create table of all
+	// combinations, and pass to write csv to loop through
+
+	for _, sourceType := range sourceTypeIDs {
+		for _, regClass := range regClassIDs {
+			for _, fuelType := range fuelTypeIDs {
+				for _, modelYear := range modelYearIDs {
+					for _, opMode := range opModeIDs {
+						emissionRate, emissionRateIM := randFloat(1), randFloat(1)
+						row := fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v", sourceType, regClass, fuelType, modelYear, opMode, emissionRate, emissionRateIM)
+						split_row := strings.Split(row, ",")
+						addToTable(&output_table, split_row)
+					}
+				}
+			}
+		}
+	}
+
+	//fmt.Println(len(output_table))
+
+	WriteDataToCSV(output_table, header) // (header, data, fn)
 
 }
+*/
 
 func addToTable[t any](data_table *[][]string, dataToAdd []t) {
 	joinedData := strings.Trim(strings.Replace(fmt.Sprint(dataToAdd), " ", ",", -1), "[]")
@@ -70,7 +76,7 @@ func addToTable[t any](data_table *[][]string, dataToAdd []t) {
 
 }
 
-func WriteDataToCSV(data [][]string, header []string, emptyStruct any) {
+func WriteDataToCSV(data [][]string, header []string) {
 	start := time.Now()
 	// iterate through keyValue struct for all combinations
 
@@ -87,21 +93,9 @@ func WriteDataToCSV(data [][]string, header []string, emptyStruct any) {
 	csvwriter := csv.NewWriter(csvFile)
 
 	_ = csvwriter.Write(header)
-
-	for _, sourceType := range sourceTypeIDs {
-		for _, regClass := range regClassIDs {
-			for _, fuelType := range fuelTypeIDs {
-				for _, modelYear := range modelYearIDs {
-					for _, opMode := range opModeIDs {
-						emissionRate, emissionRateIM := randFloat(1), randFloat(1)
-						row := fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v", sourceType, regClass, fuelType, modelYear, opMode, emissionRate, emissionRateIM)
-						split_row := strings.Split(row, ",")
-						_ = csvwriter.Write(split_row)
-						//fmt.Println(row)
-					}
-				}
-			}
-		}
+	// TODO: call from outside, maybe split functions, WriteRow or something
+	for _, row := range data {
+		_ = csvwriter.Write(row)
 	}
 
 	csvwriter.Flush()
