@@ -1,8 +1,14 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
+	"log"
 	"math/rand"
+	"os"
+	"reflect"
+	"strings"
+	"time"
 )
 
 /*
@@ -18,45 +24,90 @@ func WriteDataToCSV(csvFile string) {
 }
 */
 
-func main() {
-
-	//sourceTypeIDs := []int{11, 21, 31, 32, 41, 42, 43, 51, 52, 53, 54, 61, 62}
-	//regClassIDs := []int{10, 20, 30, 41, 42, 46, 47, 48, 49}
-	//fuelTypeIDs := []int{1, 2, 3, 5, 9}
-	//modelYearIDs := intSliceRange(1960, 2060, true)
-	//opModeIDs := []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 35, 36}
-
-	singleFl := randFloat(1)
-	flList := randFloat(10)
-
-	fmt.Println(singleFl)
-	fmt.Println(flList)
-
-	// empData := [][]string{}
-	// 	{"Name", "City", "Skills"},
-	// 	{"Smith", "Newyork", "Java"},
-	// 	{"William", "Paris", "Golang"},
-	// 	{"Rose", "London", "PHP"},
-
-	// csvFile, err := os.Create("employee.csv")
-
-	// if err != nil {
-	// 	log.Fatalf("failed creating file: %s", err)
-	// }
-	// csvFile.Close()
-
-	// csvwriter := csv.NewWriter(csvFile)
-
-	// for _, empRow := range empData {
-	// 	_ = csvwriter.Write(empRow)
-	// }
-
-	// csvwriter.Flush()
-	// csvFile.Close()
+type KeyValue struct {
+	SourceTypeID   int
+	RegClassID     int
+	FuelTypeID     int
+	ModelYearID    int
+	OpModeID       int
+	EmissionRate   float64
+	EmissionRateIM float64
 }
 
-func buildTable() {
+type Key struct {
+	SourceTypeID int
+	RegClassID   int
+	FuelTypeID   int
+	ModelYearID  int
+	OpModeID     int
+}
+
+var sourceTypeIDs = []int{11, 21, 31, 32, 41, 42, 43, 51, 52, 53, 54, 61, 62}
+var regClassIDs = []int{10, 20, 30, 41, 42, 46, 47, 48, 49}
+var fuelTypeIDs = []int{1, 2, 3, 5, 9}
+var modelYearIDs = intSliceRange(1960, 2060, true)
+var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 35, 36}
+
+func main() {
+
+	data_table := [][]string{}
+	//	header := getHeader(&KeyValue{})
+
+	addToTable(&data_table, sourceTypeIDs)
+	addToTable(&data_table, regClassIDs)
+	addToTable(&data_table, fuelTypeIDs)
+	addToTable(&data_table, modelYearIDs)
+	addToTable(&data_table, opModeIDs)
+
+	//	WriteDataToCSV(header, &KeyValue{}) // (header, data, fn)
+
+}
+
+func addToTable[t any](data_table *[][]string, dataToAdd []t) {
+	joinedData := strings.Trim(strings.Replace(fmt.Sprint(dataToAdd), " ", ",", -1), "[]")
+	sepData := strings.Fields(joinedData)
+	*data_table = append(*data_table, sepData)
+
+}
+
+func WriteDataToCSV(data [][]string, header []string, emptyStruct any) {
+	start := time.Now()
 	// iterate through keyValue struct for all combinations
+
+	if fileExists("benchmarkSample.csv") {
+		panic("File already exists.")
+	}
+
+	csvFile, err := os.Create("benchmarkSample.csv")
+
+	if err != nil {
+		log.Fatalf("failed creating file: %s", err)
+	}
+
+	csvwriter := csv.NewWriter(csvFile)
+
+	_ = csvwriter.Write(header)
+
+	for _, sourceType := range sourceTypeIDs {
+		for _, regClass := range regClassIDs {
+			for _, fuelType := range fuelTypeIDs {
+				for _, modelYear := range modelYearIDs {
+					for _, opMode := range opModeIDs {
+						emissionRate, emissionRateIM := randFloat(1), randFloat(1)
+						row := fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v", sourceType, regClass, fuelType, modelYear, opMode, emissionRate, emissionRateIM)
+						split_row := strings.Split(row, ",")
+						_ = csvwriter.Write(split_row)
+						//fmt.Println(row)
+					}
+				}
+			}
+		}
+	}
+
+	csvwriter.Flush()
+	csvFile.Close()
+	duration := time.Since(start)
+	fmt.Println("Total time spent: ", duration)
 }
 
 func intSliceRange(start int, end int, inclusive bool) []int {
@@ -89,5 +140,23 @@ func randFloat(length int) (randFl any) {
 		}
 		return randFl
 	}
-	return randFl
+}
+
+func getHeader(emptyStruct any) []string {
+	fields := []string{}
+	structElements := reflect.ValueOf(emptyStruct).Elem()
+
+	for i := 0; i < structElements.NumField(); i++ {
+		varName := structElements.Type().Field(i).Name
+		fields = append(fields, varName)
+	}
+	return fields
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }
