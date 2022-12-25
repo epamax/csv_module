@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
-
-	"example.com/read_csv"
+	"math/rand"
+	"read_csv"
+	"strings"
+	"time"
+	"write_csv"
 )
 
 type inputTest struct {
@@ -15,14 +18,60 @@ type inputTest struct {
 	// VPOP float64
 }
 
+type KeyValue struct {
+	SourceTypeID   int
+	RegClassID     int
+	FuelTypeID     int
+	ModelYearID    int
+	OpModeID       int
+	EmissionRate   float64
+	EmissionRateIM float64
+}
+
 // or read from list of keys? variadic ...
 
 func main() {
 
-	var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator" // will be from call
+	var sourceTypeIDs = []int{11, 21, 31, 32, 41, 42, 43, 51, 52, 53, 54, 61, 62}
+	var regClassIDs = []int{10, 20, 30, 41, 42, 46, 47, 48, 49}
+	var fuelTypeIDs = []int{1, 2, 3, 5, 9}
+	var modelYearIDs = intSliceRange(1960, 2060, true)
+	var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 35, 36}
 
-	d, data_array := read_csv.ImportData[inputTest](&inputTest{}, dir) // not sure how the internal Data struct works
-	fmt.Println(data_array)
+	output_table := [][]string{}
+	header := write_csv.GetHeader(&KeyValue{})
+	output := "C:\\Users\\mcolli03\\Documents\\testing\\data\\"
+	fn := "benchmarkTest.csv"
+
+	for _, sourceType := range sourceTypeIDs {
+		for _, regClass := range regClassIDs {
+			for _, fuelType := range fuelTypeIDs {
+				for _, modelYear := range modelYearIDs {
+					for _, opMode := range opModeIDs {
+						emissionRate, emissionRateIM := randFloat(1), randFloat(1)
+						row := fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v", sourceType, regClass, fuelType, modelYear, opMode, emissionRate, emissionRateIM)
+						split_row := strings.Split(row, ",")
+						write_csv.AddToTable(&output_table, split_row)
+					}
+				}
+			}
+		}
+	}
+
+	write_csv.WriteDataToCSV(output_table, header, output, fn)
+
+	start := time.Now()
+	// var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator" // will be from call
+
+	// d, data_array := read_csv.ImportData[inputTest](&inputTest{}, dir) // not sure how the internal Data struct works
+
+	var dir string = output + fn // will be from call
+
+	d, data_array := read_csv.ImportData[KeyValue](&KeyValue{}, dir) // not sure how the internal Data struct works
+
+	duration := time.Since(start)
+	fmt.Println("Time to read input file %v: %v", dir, duration)
+	fmt.Println(data_array[0].SourceTypeID)
 	fmt.Println(d.Fields)
 	fmt.Println(d.Types)
 
@@ -49,6 +98,38 @@ func main() {
 	// fmt.Println("Field value by index:", valByIndex)
 	// fmt.Println("Field value by name:", valByField)
 
-	fmt.Println(data_array[0].CalendarYearID)
+	//fmt.Println(data_array[0].CalendarYearID)
 
+}
+
+func intSliceRange(start int, end int, inclusive bool) []int {
+	var intSlice = []int{}
+	// create range of values because go cant do that ????????
+
+	if inclusive {
+
+		for i := start; i <= end; i++ {
+			intSlice = append(intSlice, i)
+		}
+
+	} else {
+		for i := start; i < end; i++ {
+			intSlice = append(intSlice, i)
+		}
+
+	}
+	return intSlice
+}
+
+func randFloat(length int) (randFl any) {
+	if length == 1 {
+		randFl := rand.Float64()
+		return randFl
+	} else {
+		randFl := make([]float64, length)
+		for i := 0; i < length; i++ {
+			randFl[i] = rand.Float64()
+		}
+		return randFl
+	}
 }

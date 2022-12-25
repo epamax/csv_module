@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"reflect"
 	"strings"
@@ -69,22 +68,22 @@ func main() {
 }
 */
 
-func addToTable[t any](data_table *[][]string, dataToAdd []t) {
+func AddToTable[t any](data_table *[][]string, dataToAdd []t) {
 	joinedData := strings.Trim(strings.Replace(fmt.Sprint(dataToAdd), " ", ",", -1), "[]")
 	sepData := strings.Fields(joinedData)
 	*data_table = append(*data_table, sepData)
 
 }
 
-func WriteDataToCSV(data [][]string, header []string) {
+func WriteDataToCSV(data [][]string, header []string, output string, fn string) {
 	start := time.Now()
 	// iterate through keyValue struct for all combinations
 
-	if fileExists("benchmarkSample.csv") {
+	if fileExists(fn) {
 		panic("File already exists.")
 	}
-
-	csvFile, err := os.Create("benchmarkSample.csv")
+	path := output + fn
+	csvFile, err := os.Create(path)
 
 	if err != nil {
 		log.Fatalf("failed creating file: %s", err)
@@ -104,39 +103,7 @@ func WriteDataToCSV(data [][]string, header []string) {
 	fmt.Println("Total time spent: ", duration)
 }
 
-func intSliceRange(start int, end int, inclusive bool) []int {
-	var intSlice = []int{}
-	// create range of values because go cant do that ????????
-
-	if inclusive {
-
-		for i := start; i <= end; i++ {
-			intSlice = append(intSlice, i)
-		}
-
-	} else {
-		for i := start; i < end; i++ {
-			intSlice = append(intSlice, i)
-		}
-
-	}
-	return intSlice
-}
-
-func randFloat(length int) (randFl any) {
-	if length == 1 {
-		randFl := rand.Float64()
-		return randFl
-	} else {
-		randFl := make([]float64, length)
-		for i := 0; i < length; i++ {
-			randFl[i] = rand.Float64()
-		}
-		return randFl
-	}
-}
-
-func getHeader(emptyStruct any) []string {
+func GetHeader(emptyStruct any) []string {
 	fields := []string{}
 	structElements := reflect.ValueOf(emptyStruct).Elem()
 
