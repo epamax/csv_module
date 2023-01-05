@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
+
+	"github.com/epamax/csv_module/decoder"
 )
 
 // TODO: re-assign structs and values to return? doesn't seem to retain the fields after returning
 // TODO: also indexby function to create a map to index the
+// TODO: could have seperate option depending on limiting amount of data you want to read (i.e. read all vs read row by row)
 // framework_io.ReadCSV(filepath, &dataTemplate{})
 // return slice of templates
 // make([]inputTest, 0)
@@ -32,6 +35,7 @@ type Data struct {
 	Fields map[int]string
 	Types  map[int]reflect.Kind
 	// indexed map[string]interface{}
+	prevValue []string
 }
 
 func assignFields(emptyStruct interface{}, row []string) interface{} {
@@ -45,41 +49,33 @@ func assignFields(emptyStruct interface{}, row []string) interface{} {
 	for j := 0; j < structElements.NumField(); j++ {
 		varName := structTypes.Field(j).Name
 		varType := structTypes.Field(j).Type.Kind()
+		//fmt.Println(j)
+		//fmt.Println(row[j])
+		//fmt.Println(varName)
 
 		switch varType {
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
 			reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
 			reflect.Bool:
-			val, _ := strconv.ParseInt(row[j], 10, 64) // can reflect type of struct field, but not sure how to make work for the vpop data
-			//fmt.Println("int")
-			//dataCopy.FieldByName(varName) = 5
+			val, _ := strconv.ParseInt(row[j], 0, 64) // can reflect type of struct field, but not sure how to make work for the vpop data
+			// fmt.Println(val, err, row[j])
 			reflect.ValueOf(dataCopy).Elem().FieldByName(varName).SetInt(val)
 		case reflect.Float32, reflect.Float64:
 			val, _ := strconv.ParseFloat(row[j], 64)
+			// fmt.Println(val, row[j])
 			reflect.ValueOf(dataCopy).Elem().FieldByName(varName).SetFloat(val)
-			//fmt.Println("float")
+			// fmt.Println(val)
 		case reflect.String:
 			reflect.ValueOf(dataCopy).Elem().FieldByName(varName).SetString(row[j])
-			//fmt.Println("string")
+			// fmt.Println(row[j])
 		default:
 			fmt.Println("Data type not supported")
 		}
+
+		// fmt.Println(dataCopy)
 	}
 	return dataCopy
 }
-
-// func (d *Data), what does * do here
-// d.fields := getfields, map with field, index?
-// d.types = := gettypes, map with type, index?
-// d.indexby := map[indexbystring]value
-
-// fieldbyindex := d.fields[index] = field
-// doesn't matter data_array index, will all be same
-// but matters for value
-
-// valbyindex := data_array[index]
-// want to be able to do something like data_array.getvalue(index = 0, field = 0)
-// easier to iterate through whole array
 
 // func (d *Data) readInput(emptyStruct interface{}, data [][]string) []interface{} {
 func readInput(emptyStruct interface{}, data [][]string) []interface{} {
@@ -95,9 +91,10 @@ func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 			continue
 		}
 
-		row := data[i]
+		row := strings.Fields(strings.Trim(strings.Replace(fmt.Sprint(data[i]), "  ", " ", -1), "[]"))
 		// data_copy := dereferenceIfPtr(assignFields(emptyStruct, row))
 		data_copy := assignFields(emptyStruct, row)
+		// fmt.Println(data_copy)
 		data_array = append(data_array, data_copy)
 		// fmt.Println(reflect.ValueOf(inputAtom).Elem().FieldByName(varName).Set())
 		// d.getFields(data_copy)
@@ -106,6 +103,145 @@ func readInput(emptyStruct interface{}, data [][]string) []interface{} {
 	// d.data_array := data_array[0]
 
 	return data_array
+}
+
+func BuildMapOfKeysToValues(d *Data, dir string, keyStruct interface{}, valueStruct interface{}) map[string]reflect.Value {
+	// parse CSV file into map[Key]Value
+	var newVar any
+	var elemSlice reflect.Value
+
+	data := readFile(dir)
+
+	data_map := make(map[string]reflect.Value)
+
+	keyElements := reflect.ValueOf(keyStruct).Elem()
+	valElements := reflect.ValueOf(valueStruct).Elem()
+
+	types := decoder.TypeAssertion(valueStruct)
+	sameType := checkSameType(types)
+	varType := types[d.Fields[0]]
+	newVar = reflect.New(varType).Interface()
+
+	for i, row := range data {
+		var key string
+
+		// initialize new slice of values for each row
+		if sameType {
+			elemSlice = reflect.MakeSlice(reflect.SliceOf(varType), 0, valElements.NumField())
+		} else {
+			panic("Cannot make slice of multiple types")
+		}
+
+		// header
+		if i == 0 {
+			continue
+		}
+
+		// go through all keys and create and then through values and add
+		for j := 0; j < keyElements.NumField(); j++ {
+			key += row[j] + ","
+		}
+		key = strings.Trim(key, ", ")
+
+		// have to declare slice before so doesnt keep getting re initialized or something
+		// if len types > 1, check if all same since can't return slice of different types
+		// maybe idea for later, if they are different types return as string and parse after?
+
+		for k := keyElements.NumField(); k < (keyElements.NumField() + valElements.NumField()); k++ {
+			index := k - keyElements.NumField()
+
+			varType := types[d.Fields[index]]
+			newVar = reflect.New(varType).Interface()
+
+			_ = decoder.Set(&newVar, row[k])
+			val := decoder.InterToVal(newVar)
+			elemSlice = reflect.Append(elemSlice, val)
+		}
+		// fmt.Println(elemSlice)
+		data_map[key] = elemSlice
+	}
+	return data_map
+}
+
+func BuildNestedMap(dir string) map[string]map[string]map[string]map[string]map[string][]string { // just gonna hard code this for now to see the time jk idk how
+	// parse CSV file into map[Key]Value
+	// map[sourceTypeID]map[regClassID]map[fuelTypeID]map[modelYearID]map[opModeID]
+	// can check uninitialized map using ==nil, better if not ordered
+
+	data_map := make(map[string]map[string]map[string]map[string]map[string][]string)
+	data := readFile(dir)
+	d := new(Data)
+
+	for i, row := range data {
+
+		row = strings.Fields(strings.Join(row, " "))
+
+		// header
+		if i == 0 {
+			continue
+		}
+
+		// intialize map (?) i think, is this right, jk overwrites, jk fixed but p ugly
+		// will think about later but just to make work, check each previous value
+		if i == 1 {
+			d.prevValue = []string{}
+			d.prevValue = append(d.prevValue, row[0])
+			d.prevValue = append(d.prevValue, row[1])
+			d.prevValue = append(d.prevValue, row[2])
+			d.prevValue = append(d.prevValue, row[3])
+			// fmt.Println(d.prevValue)
+			data_map[row[0]] = make(map[string]map[string]map[string]map[string][]string)
+			data_map[row[0]][row[1]] = make(map[string]map[string]map[string][]string)
+			data_map[row[0]][row[1]][row[2]] = make(map[string]map[string][]string)
+			data_map[row[0]][row[1]][row[2]][row[3]] = make(map[string][]string)
+			data_map[row[0]][row[1]][row[2]][row[3]][row[4]] = []string{row[5], row[6]} //TODO: type conversions
+		}
+
+		if d.prevValue[0] != row[0] {
+			data_map[row[0]] = make(map[string]map[string]map[string]map[string][]string)
+			d.prevValue[0] = row[0]
+		} else if d.prevValue[1] != row[1] {
+			data_map[row[0]][row[1]] = make(map[string]map[string]map[string][]string)
+			d.prevValue[1] = row[1]
+		} else if d.prevValue[2] != row[2] {
+			data_map[row[0]][row[1]][row[2]] = make(map[string]map[string][]string)
+			d.prevValue[2] = row[2]
+		} else if d.prevValue[3] != row[3] {
+			data_map[row[0]][row[1]][row[2]][row[3]] = make(map[string][]string)
+			d.prevValue[3] = row[3]
+		} else {
+			data_map[row[0]][row[1]][row[2]][row[3]][row[4]] = []string{row[5], row[6]}
+		}
+		//fmt.Println(data_map)
+
+		// var sourceTypeIDs = []int{11, 21, 31, 32, 41, 42, 43, 51, 52, 53, 54, 61, 62}
+		// var regClassIDs = []int{10, 20, 30, 41, 42, 46, 47, 48, 49}
+		// var fuelTypeIDs = []int{1, 2, 3, 5, 9}
+		// var modelYearIDs = intSliceRange(1960, 2060, true)
+		// var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 35, 36}
+
+		// 11 :
+		// 	{10: {
+		// 		1: {
+		// 			1960: {
+		// 				0: [0.1243, 0.1234]
+		// 				1:
+		// 				11:
+		// 			}
+		// 			1961:
+		// 			1962:
+		// 		}
+		// 		2:
+		// 		3:
+		// 	}
+		// 	20:
+		// 30:}
+		// 12:
+		// 13:
+
+		//data_map[var0][var1][var2][var3][var4] = []float64{var5, var6}
+	}
+	return data_map
 }
 
 func GetValue(value interface{}) interface{} {
@@ -120,6 +256,27 @@ func GetValue(value interface{}) interface{} {
 
 	}
 
+}
+
+func checkSameType(types map[string]reflect.Type) bool {
+	//traverse through the map
+	var valueCheck reflect.Type
+	cnt := 0
+	if len(types) > 1 {
+		for _, value := range types {
+			if cnt == 0 {
+				valueCheck = value
+				continue
+			} else {
+				//check if present value is equals to userValue
+				if value != valueCheck {
+					return false
+				}
+			}
+			cnt++
+		}
+	}
+	return true
 }
 
 // func (d *Data) getFields(value interface{}) {
@@ -146,64 +303,41 @@ func (d *Data) GetFields(value interface{}) {
 	d.Types = types
 }
 
-// Used originally before getting fields through type conversion, unneccessary now
+func readFile(dir string) [][]string {
 
-// func TypeByField(field string, dataStruct interface{}) reflect.Type {
-// 	return reflect.ValueOf(dataStruct).Elem().FieldByName(field).Type()
-// }
+	// TODO: should loop through if directory than one or only do one at a time?
 
-// func TypeByIndex(index int, dataStruct interface{}) reflect.Type {
-// 	return reflect.ValueOf(dataStruct).Elem().Field(index).Type()
-// }
-
-// func ValByField(field string, dataStruct interface{}) reflect.Value {
-// 	return reflect.ValueOf(dataStruct).Elem().FieldByName(field)
-// }
-
-// func ValByIndex(index int, dataStruct interface{}) reflect.Value {
-// 	return reflect.ValueOf(dataStruct).Elem().Field(index)
-// }
-
-// func FieldByIndex(index int, dataStruct interface{}) string {
-// 	structElements := reflect.ValueOf(dataStruct).Elem()
-// 	structTypes := structElements.Type()
-
-// 	if index < structElements.NumField() {
-// 		varName := structTypes.Field(index).Name
-// 		return varName
-// 		// varType := structTypes.Field(j).Type.Kind()
-// 	} else {
-// 		fmt.Println("Index out of bounds for struct of length", structElements.NumField())
-// 		return ""
-// 	}
-// }
-
-// func (d *Data) ImportData(emptyStruct interface{}, dir string) []interface{} {
-
-func ImportData[t any](emptyStruct interface{}, dir string) (d Data, conv_array []t) {
-
-	// TODO: check if dir or single file
-
-	// to iterate over multiple files
-
-	//files, err := ioutil.ReadDir(dir)
-
-	// for _, file := range files {
-	// fn := strings.Join([]string{dir, file.Name()}, "\\")
-
-	files, err := filepath.Glob(dir + "\\*.csv")
+	f, err := os.Open(dir)
 
 	if err != nil {
+		fmt.Println("error: ", err)
 		log.Fatal(err)
 	}
 
-	fn := files[0] // change
+	// fn := files[0] // change
 
-	f, err := os.Open(fn)
+	// This returns an *os.FileInfo type
+	fileInfo, err := f.Stat()
 
 	if err != nil {
+		fmt.Println("error: ", err)
 		log.Fatal(err)
 	}
+
+	// IsDir is short for fileInfo.Mode().IsDir()
+	if fileInfo.IsDir() {
+		panic("Path is a directory")
+
+		// to iterate over multiple files
+
+		//	files, err := ioutil.ReadDir(dir)
+
+		// for _, file := range files {
+		// fn := strings.Join([]string{dir, file.Name()}, "\\")
+
+		// files, err := filepath.Glob(dir + "\\*.csv")
+	}
+	// file is not a directory
 
 	// remember to close the file at the end of the program
 	defer f.Close()
@@ -215,6 +349,14 @@ func ImportData[t any](emptyStruct interface{}, dir string) (d Data, conv_array 
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	return data
+}
+
+func ImportData[t any](emptyStruct interface{}, dir string) (d Data, conv_array []t) {
+
+	data := readFile(dir)
+
 	data_array := readInput(emptyStruct, data)
 
 	conv_array = AssignStruct[t](data_array)

@@ -1,23 +1,18 @@
 package main
 
+// TODO: generalize given header, could make map index given field names or struct tags if field different from header etc.
+// TODO: could make seperate option to read line by line if want specific column or limit number of lines without reading in all data
+
 import (
 	"fmt"
 	"math/rand"
+	"reflect"
 	"strings"
 	"time"
 
-	"example.com/read_csv"
-	"example.com/write_csv"
+	"github.com/epamax/csv_module/read_csv"
+	"github.com/epamax/csv_module/write_csv"
 )
-
-type inputTest struct {
-	CalendarYearID int // how would calendar year be input?
-	ModelYearID    int // top row, model year <= calendar year
-	AgeFractionID  float64
-	//	SizeClassID int
-	//	TierID      string
-	// VPOP float64
-}
 
 type KeyValue struct {
 	SourceTypeID   int
@@ -25,6 +20,19 @@ type KeyValue struct {
 	FuelTypeID     int
 	ModelYearID    int
 	OpModeID       int
+	EmissionRate   float64
+	EmissionRateIM float64
+}
+
+type Key struct {
+	SourceTypeID int
+	RegClassID   int
+	FuelTypeID   int
+	ModelYearID  int
+	OpModeID     int
+}
+
+type Value struct {
 	EmissionRate   float64
 	EmissionRateIM float64
 }
@@ -40,8 +48,8 @@ func main() {
 	var opModeIDs = []int{0, 1, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 33, 35, 36}
 
 	output_table := [][]string{}
-	header := write_csv.GetHeader(&KeyValue{})
-	output := "C:\\Users\\mcolli03\\Documents\\testing\\data\\"
+	header := write_csv.GetHeader(&KeyValue{}) // could create struct field from header
+	output := "C:\\Users\\mcolli03\\go\\scripts\\data\\"
 	fn := "benchmarkTest.csv"
 
 	for _, sourceType := range sourceTypeIDs {
@@ -52,55 +60,63 @@ func main() {
 						emissionRate, emissionRateIM := randFloat(1), randFloat(1)
 						row := fmt.Sprintf("%v, %v, %v, %v, %v, %v, %v", sourceType, regClass, fuelType, modelYear, opMode, emissionRate, emissionRateIM)
 						split_row := strings.Split(row, ",")
-						write_csv.AddToTable(&output_table, split_row)
+						write_csv.AddToTable(&output_table, split_row) // why did i recreate append
 					}
 				}
 			}
 		}
 	}
 
+	// 1,240,785 rows
 	write_csv.WriteDataToCSV(output_table, header, output, fn)
 
 	start := time.Now()
-	// var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator" // will be from call
+	// var dir string = "C:\\Users\\Public\\dozermodel2023\\calculator\\ageDistributionCalculator"
 
-	// d, data_array := read_csv.ImportData[inputTest](&inputTest{}, dir) // not sure how the internal Data struct works
+	// d, data_array := read_csv.ImportData[inputTest](&inputTest{}, dir)
 
 	var dir string = output + fn // will be from call
 
-	d, data_array := read_csv.ImportData[KeyValue](&KeyValue{}, dir) // not sure how the internal Data struct works
+	d, data_array := read_csv.ImportData[KeyValue](&KeyValue{}, dir)
 
 	duration := time.Since(start)
-	fmt.Println("Time to read input file %v: %v", dir, duration)
+	fmt.Printf("Time to read input file as slice of structs %v: %v \n", dir, duration)
 	fmt.Println(data_array[0].SourceTypeID)
 	fmt.Println(d.Fields)
 	fmt.Println(d.Types)
 
-	// fmt.Println(data_array) // how to deal with this?
-	// save original data_array internally to check fields etc.?
-	// ! only need to save one interface to check fields
-	// I think? brain hurt how do
-	// create some kind of interface in package to hold fields and use that to index/get value etc
+	start = time.Now()
+	emRate, emRateIM := LookupSliceOfStructs(data_array, 62, 49, 9, 2060, 36)
+	duration = time.Since(start)
 
-	// fields := read_csv.GetFields(data_array[0]) // show field types are included, but may be better to make optional so can use in passing to other functions
-	// or -> fields := getFields(data_array[0])
+	fmt.Printf("Time taken to locate slice %v, %v: %v \n", emRate, emRateIM, duration)
 
-	// fieldByIndex := read_csv.FieldByIndex(0, data_array[0]) // returns field name
-	// typeByIndex := read_csv.TypeByIndex(0, data_array[0])
-	// typeByField := read_csv.TypeByField(fieldByIndex, data_array[0])
-	// valByIndex := read_csv.ValByIndex(0, data_array[0])
-	// valByField := read_csv.ValByField(fieldByIndex, data_array[0])
+	valFields := new(read_csv.Data)
+	valFields.GetFields(&Value{})
 
-	//fmt.Println("Struct fields:", fields)
+	start = time.Now()
+	dataMap := read_csv.BuildMapOfKeysToValues(valFields, dir, &Key{}, &Value{})
+	duration = time.Since(start)
 
-	// fmt.Println("Field name:", fieldByIndex)
-	// fmt.Println("Field type by index:", typeByIndex)
-	// fmt.Println("Field type by name:", typeByField)
-	// fmt.Println("Field value by index:", valByIndex)
-	// fmt.Println("Field value by name:", valByField)
+	fmt.Println("Time to build map: ", duration)
 
-	//fmt.Println(data_array[0].CalendarYearID)
+	start = time.Now()
+	values := LookupMapOfKeysToValues(dataMap, 62, 49, 9, 2060, 36)
+	duration = time.Since(start)
 
+	fmt.Printf("Time to find values %v from map: %v \n", values, duration)
+
+	start = time.Now()
+	nestedMap := read_csv.BuildNestedMap(dir)
+	duration = time.Since(start)
+
+	fmt.Printf("Time to build nested map: %v \n", duration)
+
+	start = time.Now()
+	nestedVals := LookupNestedMap(nestedMap, "62", "49", "9", "2060", "36")
+	duration = time.Since(start)
+
+	fmt.Printf("Time to find values %v from nested map: %v \n", nestedVals, duration)
 }
 
 func intSliceRange(start int, end int, inclusive bool) []int {
@@ -133,4 +149,27 @@ func randFloat(length int) (randFl any) {
 		}
 		return randFl
 	}
+}
+
+func LookupSliceOfStructs(data []KeyValue, sourceTypeID, regClassID, fuelTypeID, modelYearID, opModeID int) (float64, float64) {
+	// return the correct KeyValue in data corresponding to the input values
+	for _, val := range data { // this feels wrong help
+		// fmt.Println(val)
+		if (val.SourceTypeID == sourceTypeID) && (val.RegClassID == regClassID) && (val.FuelTypeID == fuelTypeID) && (val.ModelYearID == modelYearID) && (val.OpModeID == opModeID) {
+			return val.EmissionRate, val.EmissionRateIM
+		}
+	}
+	panic("Value not found")
+}
+
+func LookupMapOfKeysToValues(data map[string]reflect.Value, sourceTypeID, regClassID, fuelTypeID, modelYearID, opModeID int) reflect.Value {
+	// return the correct Value in data corresponding to the input values
+	key := fmt.Sprintf("%v, %v, %v, %v, %v", sourceTypeID, regClassID, fuelTypeID, modelYearID, opModeID)
+	return data[key]
+}
+
+// TODO: fix types data map[int]map[int]map[int]map[int]map[int]Value
+func LookupNestedMap(data map[string]map[string]map[string]map[string]map[string][]string, sourceTypeID, regClassID, fuelTypeID, modelYearID, opModeID string) []string {
+	// return the correct Value in data corresponding to the input values
+	return data[sourceTypeID][regClassID][fuelTypeID][modelYearID][opModeID]
 }

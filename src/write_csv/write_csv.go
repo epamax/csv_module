@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"reflect"
+	"strings"
 	"time"
 )
 
@@ -67,17 +68,18 @@ func main() {
 }
 */
 
-func AddToTable(data_table *[][]string, dataToAdd []string) {
-	//joinedData := strings.Trim(strings.Replace(fmt.Sprint(dataToAdd), "  ", " ", -1), "[]")
-	//sepData := strings.Fields(joinedData)
-	*data_table = append(*data_table, dataToAdd)
+func AddToTable[t any](data_table *[][]string, dataToAdd []t) {
+	joinedData := strings.Trim(strings.Replace(fmt.Sprint(dataToAdd), " ", ",", -1), "[]")
+	sepData := strings.Fields(joinedData)
+	*data_table = append(*data_table, sepData)
 
 }
 
 func WriteDataToCSV(data [][]string, header []string, output string, fn string) {
 	start := time.Now()
+	// iterate through keyValue struct for all combinations
 
-	if fileExists(fn) { // to actually work, change fn to output+fn
+	if fileExists(fn) {
 		panic("File already exists.")
 	}
 	path := output + fn
@@ -98,7 +100,7 @@ func WriteDataToCSV(data [][]string, header []string, output string, fn string) 
 	csvwriter.Flush()
 	csvFile.Close()
 	duration := time.Since(start)
-	fmt.Println("Total time spent to write file: ", duration)
+	fmt.Println("Total time spent: ", duration)
 }
 
 func GetHeader(emptyStruct any) []string {
